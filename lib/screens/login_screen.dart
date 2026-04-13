@@ -7,32 +7,67 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: Center(
         child: Container(
-          width: 400, // Keeps the form from stretching too wide on web
+          width: 400,
           padding: const EdgeInsets.all(32.0),
           child: ListView(
             shrinkWrap: true,
             children: [
-              const Text(
-                'Admin Portal',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
+              // ── UniFind Branding ─────────────────────────────
+              Column(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      Icons.travel_explore_rounded,
+                      size: 36,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'UniFind',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'University Lost & Found Admin Portal',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurface.withValues(alpha: 0.55),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 36),
               
               // Pre-built Email/Password Login Form
               SupaEmailAuth(
                 redirectTo: null,
                 onSignInComplete: (response) {
+                  ScaffoldMessenger.of(context).clearSnackBars();
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (context) => const DashboardScreen()),
                   );
                 },
                 onSignUpComplete: (response) {
-                  // Optional: Handle what happens if they create a new account
+                  ScaffoldMessenger.of(context).clearSnackBars();
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (context) => const DashboardScreen()),
@@ -51,6 +86,7 @@ class LoginScreen extends StatelessWidget {
                 // CRITICAL FOR WEB: Explicitly define your local testing port
                 redirectUrl: 'http://localhost:3000', 
                 onSuccess: (response) {
+                  ScaffoldMessenger.of(context).clearSnackBars();
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (context) => const DashboardScreen()),
