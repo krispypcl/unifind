@@ -21,8 +21,6 @@ class _MyAccountViewState extends State<MyAccountView> {
   final _middleNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _studentIdCtrl = TextEditingController();
-  final _roleCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   final _contactCtrl = TextEditingController();
 
   @override
@@ -37,8 +35,6 @@ class _MyAccountViewState extends State<MyAccountView> {
     _middleNameCtrl.dispose();
     _lastNameCtrl.dispose();
     _studentIdCtrl.dispose();
-    _roleCtrl.dispose();
-    _emailCtrl.dispose();
     _contactCtrl.dispose();
     super.dispose();
   }
@@ -60,14 +56,10 @@ class _MyAccountViewState extends State<MyAccountView> {
 
   void _startEditing() {
     final p = _profile ?? {};
-    final authEmail = supabase.auth.currentUser?.email ?? '';
     _firstNameCtrl.text = p['first_name'] as String? ?? '';
     _middleNameCtrl.text = p['middle_name'] as String? ?? '';
     _lastNameCtrl.text = p['last_name'] as String? ?? '';
     _studentIdCtrl.text = p['student_id'] as String? ?? '';
-    _roleCtrl.text = p['role'] as String? ?? '';
-    _emailCtrl.text =
-        (p['email'] as String?)?.isNotEmpty == true ? p['email'] as String : authEmail;
     _contactCtrl.text = p['contact'] as String? ?? '';
     setState(() => _isEditing = true);
   }
@@ -87,8 +79,7 @@ class _MyAccountViewState extends State<MyAccountView> {
         'student_id': _studentIdCtrl.text.trim().isEmpty
             ? null
             : _studentIdCtrl.text.trim(),
-        'role': _roleCtrl.text.trim(),
-        'email': _emailCtrl.text.trim(),
+        'role': 'admin',
         'contact': _contactCtrl.text.trim(),
       };
       await supabase.from('users').upsert(data);
@@ -183,8 +174,6 @@ class _MyAccountViewState extends State<MyAccountView> {
                   middleNameCtrl: _middleNameCtrl,
                   lastNameCtrl: _lastNameCtrl,
                   studentIdCtrl: _studentIdCtrl,
-                  roleCtrl: _roleCtrl,
-                  emailCtrl: _emailCtrl,
                   contactCtrl: _contactCtrl,
                 )
               else if (_profile == null)
@@ -210,8 +199,6 @@ class _EditForm extends StatelessWidget {
   final TextEditingController middleNameCtrl;
   final TextEditingController lastNameCtrl;
   final TextEditingController studentIdCtrl;
-  final TextEditingController roleCtrl;
-  final TextEditingController emailCtrl;
   final TextEditingController contactCtrl;
 
   const _EditForm({
@@ -220,8 +207,6 @@ class _EditForm extends StatelessWidget {
     required this.middleNameCtrl,
     required this.lastNameCtrl,
     required this.studentIdCtrl,
-    required this.roleCtrl,
-    required this.emailCtrl,
     required this.contactCtrl,
   });
 
@@ -276,50 +261,19 @@ class _EditForm extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: studentIdCtrl,
-                      decoration: const InputDecoration(
-                          labelText: 'Student ID (optional)',
-                          border: OutlineInputBorder()),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: roleCtrl,
-                      decoration: const InputDecoration(
-                          labelText: 'Role', border: OutlineInputBorder()),
-                    ),
-                  ),
-                ],
+              TextFormField(
+                controller: studentIdCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Student ID (optional)',
+                    border: OutlineInputBorder()),
               ),
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: emailCtrl,
-                      decoration: const InputDecoration(
-                          labelText: 'Email', border: OutlineInputBorder()),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: contactCtrl,
-                      decoration: const InputDecoration(
-                          labelText: 'Contact Number',
-                          border: OutlineInputBorder()),
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                ],
+              TextFormField(
+                controller: contactCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Contact Number',
+                    border: OutlineInputBorder()),
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 8),
               Text(
@@ -369,7 +323,10 @@ class _AccountCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final p = profile;
     final email = authEmail ?? (p['email'] as String? ?? '—');
-    final role = p['role'] as String? ?? 'User';
+    final rawRole = (p['role'] as String?)?.isNotEmpty == true
+        ? p['role'] as String
+        : 'admin';
+    final role = '${rawRole[0].toUpperCase()}${rawRole.substring(1)}';
     final studentId = p['student_id']?.toString();
 
     return Card(

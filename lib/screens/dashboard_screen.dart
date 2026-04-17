@@ -4,6 +4,7 @@ import 'login_screen.dart';
 import 'views/items_list_view.dart';
 import 'views/add_item_view.dart';
 import 'views/my_account_view.dart';
+import 'views/claims_view.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -32,6 +33,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return const AddItemView();
       case 2:
+        return const ClaimsView();
+      case 3:
         return const MyAccountView();
       default:
         return const ItemsListView();
@@ -79,10 +82,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(width: 4),
             _NavTab(
-              icon: Icons.account_circle_outlined,
-              label: 'My Account',
+              icon: Icons.assignment_turned_in_outlined,
+              label: 'Claims',
               selected: _selectedIndex == 2,
               onTap: () => setState(() => _selectedIndex = 2),
+            ),
+            const SizedBox(width: 4),
+            _NavTab(
+              icon: Icons.account_circle_outlined,
+              label: 'My Account',
+              selected: _selectedIndex == 3,
+              onTap: () => setState(() => _selectedIndex = 3),
             ),
           ],
         ),

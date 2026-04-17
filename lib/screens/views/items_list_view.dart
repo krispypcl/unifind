@@ -1,35 +1,41 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../main.dart';
 import 'item_details_view.dart';
 
-Future<void> _confirmDelete(
-    BuildContext context, Map<String, dynamic> item) async {
+Future<void> _toggleClose(
+    BuildContext context, Map<String, dynamic> item, VoidCallback? onDone) async {
+  final isClosed = item['status'] == 'closed';
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Delete Item'),
-      content: Text(
-          'Are you sure you want to delete "${item['title'] ?? 'this item'}"? This cannot be undone.'),
+      title: Text(isClosed ? 'Reopen Item' : 'Close Item'),
+      content: Text(isClosed
+          ? 'Reopen "${item['title'] ?? 'this item'}"? It will be set back to open.'
+          : 'Close "${item['title'] ?? 'this item'}"? It will no longer appear as active.'),
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel')),
         FilledButton(
-          style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error),
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Delete'),
+          child: Text(isClosed ? 'Reopen' : 'Close'),
         ),
       ],
     ),
   );
   if (confirmed == true) {
     try {
-      await supabase.from('items').delete().eq('id', item['id']);
+      final newStatus = isClosed ? 'open' : 'closed';
+      await supabase
+          .from('items')
+          .update({'status': newStatus})
+          .eq('id', item['id']);
+      onDone?.call();
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error deleting item: $e')));
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -45,6 +51,51 @@ class ItemsListView extends StatefulWidget {
 class _ItemsListViewState extends State<ItemsListView> {
   String? _typeFilter;
   String? _statusFilter;
+
+  List<Map<String, dynamic>> _items = [];
+  bool _isLoading = true;
+  String? _error;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchItems();
+    // Auto-refresh every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) _fetchItems(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchItems({bool silent = false}) async {
+    if (!silent) setState(() { _isLoading = true; _error = null; });
+    try {
+      final data = await supabase
+          .from('items')
+          .select()
+          .order('created_at', ascending: false);
+      if (mounted) {
+        setState(() {
+          _items = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   List<Map<String, dynamic>> _applyFilters(List<Map<String, dynamic>> items) {
     return items.where((i) {
@@ -73,6 +124,12 @@ class _ItemsListViewState extends State<ItemsListView> {
                   .textTheme
                   .headlineSmall
                   ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Refresh',
+              onPressed: _fetchItems,
             ),
           ],
         ),
@@ -146,80 +203,95 @@ class _ItemsListViewState extends State<ItemsListView> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1400),
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: supabase.from('items').stream(primaryKey: ['id']),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final items = _applyFilters(snapshot.data!);
-
-                  if (items.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox_outlined,
-                              size: 52,
-                              color: colorScheme.onSurface
-                                  .withValues(alpha: 0.3)),
-                          const SizedBox(height: 12),
-                          Text(
-                            _typeFilter == null && _statusFilter == null
-                                ? 'No items found.'
-                                : 'No items match the current filters.',
-                            style: TextStyle(
-                                color: colorScheme.onSurface
-                                    .withValues(alpha: 0.5)),
-                          ),
-                          if (_typeFilter != null || _statusFilter != null) ...[
-                            const SizedBox(height: 12),
-                            TextButton.icon(
-                              icon: const Icon(Icons.filter_alt_off_outlined,
-                                  size: 16),
-                              label: const Text('Clear filters'),
-                              onPressed: () => setState(() {
-                                _typeFilter = null;
-                                _statusFilter = null;
-                              }),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }
-
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      final cols = constraints.maxWidth > 900
-                          ? 3
-                          : constraints.maxWidth > 550
-                              ? 2
-                              : 1;
-                      return GridView.builder(
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: cols,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.72,
-                        ),
-                        itemCount: items.length,
-                        itemBuilder: (context, index) =>
-                            _ItemGridCard(item: items[index]),
-                      );
-                    },
-                  );
-                },
-              ),
+              child: _buildGrid(colorScheme),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGrid(ColorScheme colorScheme) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off_rounded,
+                size: 52, color: colorScheme.onSurface.withValues(alpha: 0.3)),
+            const SizedBox(height: 12),
+            Text('Failed to load items',
+                style: TextStyle(
+                    color: colorScheme.onSurface.withValues(alpha: 0.6))),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Retry'),
+              onPressed: _fetchItems,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final items = _applyFilters(_items);
+
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_outlined,
+                size: 52,
+                color: colorScheme.onSurface.withValues(alpha: 0.3)),
+            const SizedBox(height: 12),
+            Text(
+              _typeFilter == null && _statusFilter == null
+                  ? 'No items found.'
+                  : 'No items match the current filters.',
+              style:
+                  TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5)),
+            ),
+            if (_typeFilter != null || _statusFilter != null) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                icon: const Icon(Icons.filter_alt_off_outlined, size: 16),
+                label: const Text('Clear filters'),
+                onPressed: () => setState(() {
+                  _typeFilter = null;
+                  _statusFilter = null;
+                }),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = constraints.maxWidth > 900
+            ? 3
+            : constraints.maxWidth > 550
+                ? 2
+                : 1;
+        return GridView.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.72,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) => _ItemGridCard(
+            item: items[index],
+            onRefresh: () => _fetchItems(silent: true),
+          ),
+        );
+      },
     );
   }
 }
@@ -228,7 +300,8 @@ class _ItemsListViewState extends State<ItemsListView> {
 
 class _ItemGridCard extends StatelessWidget {
   final Map<String, dynamic> item;
-  const _ItemGridCard({required this.item});
+  final VoidCallback? onRefresh;
+  const _ItemGridCard({required this.item, this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -251,7 +324,7 @@ class _ItemGridCard extends StatelessWidget {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => ItemDetailsView(item: item)),
-        ),
+        ).then((_) => onRefresh?.call()),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -286,24 +359,31 @@ class _ItemGridCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Delete button
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Material(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => _confirmDelete(context, item),
-                        child: const Padding(
-                          padding: EdgeInsets.all(6),
-                          child: Icon(Icons.delete_outline,
-                              size: 16, color: Colors.white),
+                  // Close / Reopen button (hidden for claimed items)
+                  if (status != 'claimed')
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () =>
+                              _toggleClose(context, item, onRefresh),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Icon(
+                              status == 'closed'
+                                  ? Icons.unarchive_outlined
+                                  : Icons.archive_outlined,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

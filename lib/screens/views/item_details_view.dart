@@ -27,7 +27,6 @@ class _ItemDetailsViewState extends State<ItemDetailsView> {
   late final TextEditingController _categoryCtrl;
   late final TextEditingController _imageUrlCtrl;
   late String _editType;
-  late String _editStatus;
 
   @override
   void initState() {
@@ -48,7 +47,6 @@ class _ItemDetailsViewState extends State<ItemDetailsView> {
     _imageUrlCtrl =
         TextEditingController(text: _item['image_url'] as String? ?? '');
     _editType = _item['type'] as String? ?? 'found';
-    _editStatus = _item['status'] as String? ?? 'open';
   }
 
   Future<void> _loadExtraData() async {
@@ -123,7 +121,6 @@ class _ItemDetailsViewState extends State<ItemDetailsView> {
     _categoryCtrl.text = _item['category_id']?.toString() ?? '';
     _imageUrlCtrl.text = _item['image_url'] as String? ?? '';
     _editType = _item['type'] as String? ?? 'found';
-    _editStatus = _item['status'] as String? ?? 'open';
     setState(() => _isEditing = false);
   }
 
@@ -142,7 +139,6 @@ class _ItemDetailsViewState extends State<ItemDetailsView> {
             ? null
             : _imageUrlCtrl.text.trim(),
         'type': _editType,
-        'status': _editStatus,
       };
       // .select() forces execution and lets us detect if 0 rows were matched
       final result = await supabase
@@ -217,12 +213,24 @@ class _ItemDetailsViewState extends State<ItemDetailsView> {
               },
             ),
           ),
-          if (!_isEditing)
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Edit Item',
-              onPressed: _startEditing,
-            ),
+          if (!_isEditing) ...[
+            if (_item['status'] == 'claimed' ||
+                _item['status'] == 'closed')
+              Tooltip(
+                message: 'Cannot edit a ${_item['status']} item',
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(Icons.lock_outline_rounded,
+                      size: 20, color: Colors.grey),
+                ),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit Item',
+                onPressed: _startEditing,
+              ),
+          ],
           if (_isEditing) ...[
             if (_isSaving)
               const Padding(
@@ -534,20 +542,60 @@ class _ItemDetailsViewState extends State<ItemDetailsView> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey('status_$_editStatus'),
-                      initialValue: _editStatus,
-                      decoration: const InputDecoration(
-                          labelText: 'Status', border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: 'open', child: Text('Open')),
-                        DropdownMenuItem(
-                            value: 'claimed', child: Text('Claimed')),
-                        DropdownMenuItem(
-                            value: 'closed', child: Text('Closed')),
-                      ],
-                      onChanged: (v) => setState(() => _editStatus = v!),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'Status',
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: 0.4),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.lock_outline_rounded,
+                              size: 14,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.45)),
+                          const SizedBox(width: 6),
+                          Text(
+                            (_item['status'] as String? ?? 'open')
+                                .toUpperCase(),
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.55)),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Spacer(),
+                  Icon(Icons.info_outline,
+                      size: 12,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.4)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Status is managed by claim requests.',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.4)),
                   ),
                 ],
               ),

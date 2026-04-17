@@ -83,10 +83,17 @@ class LoginScreen extends StatelessWidget {
               SupaSocialsAuth(
                 socialProviders: const [OAuthProvider.google],
                 colored: true,
+                showSuccessSnackBar: false,
                 // CRITICAL FOR WEB: Explicitly define your local testing port
-                redirectUrl: 'http://localhost:3000', 
+                redirectUrl: 'http://localhost:3000',
                 onSuccess: (response) {
-                  ScaffoldMessenger.of(context).clearSnackBars();
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Successfully signed in!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (context) => const DashboardScreen()),

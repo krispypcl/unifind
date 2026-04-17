@@ -17,10 +17,13 @@ class _AddItemViewState extends State<AddItemView> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
-  final _categoryIdController = TextEditingController();
 
   String _selectedType = 'lost';
   String _selectedStatus = 'open';
+  int? _selectedCategoryId;
+
+  List<Map<String, dynamic>> _categories = [];
+  bool _categoriesLoading = true;
 
   XFile? _pickedImage;
   Uint8List? _imageBytes;
@@ -29,11 +32,33 @@ class _AddItemViewState extends State<AddItemView> {
   final _picker = ImagePicker();
 
   @override
+  void initState() {
+    super.initState();
+    _fetchCategories();
+  }
+
+  Future<void> _fetchCategories() async {
+    try {
+      final data = await supabase
+          .from('categories')
+          .select('id, name')
+          .order('name');
+      if (mounted) {
+        setState(() {
+          _categories = List<Map<String, dynamic>>.from(data);
+          _categoriesLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _categoriesLoading = false);
+    }
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     _locationController.dispose();
-    _categoryIdController.dispose();
     super.dispose();
   }
 
@@ -88,7 +113,7 @@ class _AddItemViewState extends State<AddItemView> {
         'location': _locationController.text.trim(),
         'type': _selectedType,
         'status': _selectedStatus,
-        'category_id': int.tryParse(_categoryIdController.text),
+        if (_selectedCategoryId != null) 'category_id': _selectedCategoryId,
         'image_url': imageUrl,
         'user_id': userId,
       });
@@ -99,12 +124,12 @@ class _AddItemViewState extends State<AddItemView> {
         _titleController.clear();
         _descriptionController.clear();
         _locationController.clear();
-        _categoryIdController.clear();
         setState(() {
           _pickedImage = null;
           _imageBytes = null;
           _selectedType = 'lost';
           _selectedStatus = 'open';
+          _selectedCategoryId = null;
         });
       }
     } catch (e) {
@@ -194,12 +219,25 @@ class _AddItemViewState extends State<AddItemView> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: TextFormField(
-                                controller: _categoryIdController,
+                              child: DropdownButtonFormField<int>(
+                                key: ValueKey('cat_$_selectedCategoryId'),
+                                initialValue: _selectedCategoryId,
                                 decoration: const InputDecoration(
-                                    labelText: 'Category ID',
+                                    labelText: 'Category',
                                     border: OutlineInputBorder()),
-                                keyboardType: TextInputType.number,
+                                hint: _categoriesLoading
+                                    ? const Text('Loading...')
+                                    : const Text('Select category'),
+                                items: _categories
+                                    .map((c) => DropdownMenuItem<int>(
+                                          value: c['id'] as int,
+                                          child: Text(c['name'] as String),
+                                        ))
+                                    .toList(),
+                                onChanged: _categoriesLoading
+                                    ? null
+                                    : (v) => setState(
+                                        () => _selectedCategoryId = v),
                               ),
                             ),
                           ],
