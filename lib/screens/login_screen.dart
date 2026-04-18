@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_auth_ui/supabase_auth_ui.dart';
+import '../main.dart';
 import 'dashboard_screen.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -66,12 +67,24 @@ class LoginScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (context) => const DashboardScreen()),
                   );
                 },
-                onSignUpComplete: (response) {
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const DashboardScreen()),
-                  );
+                onSignUpComplete: (response) async {
+                  final user = response.user;
+                  if (user != null) {
+                    try {
+                      await supabase.from('users').upsert({
+                        'id': user.id,
+                        'email': user.email,
+                        'role': 'admin',
+                      });
+                    } catch (_) {}
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+                    );
+                  }
                 },
               ),
               

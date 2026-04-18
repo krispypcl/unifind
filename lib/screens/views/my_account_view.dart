@@ -73,6 +73,7 @@ class _MyAccountViewState extends State<MyAccountView> {
       final userId = supabase.auth.currentUser!.id;
       final data = {
         'id': userId,
+        'email': supabase.auth.currentUser?.email,
         'first_name': _firstNameCtrl.text.trim(),
         'middle_name': _middleNameCtrl.text.trim(),
         'last_name': _lastNameCtrl.text.trim(),
