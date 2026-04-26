@@ -28,7 +28,7 @@ Unifind streamlines the process of managing lost items by providing a dedicated 
 ### Installation
 
    ```bash
-   git clone [https://github.com/krispypcl/unifind.git](https://github.com/krispypcl/unifind.git)
+   git clone https://github.com/krispypcl/unifind
    cd unifind
    flutter pub get
    flutter run -d chrome --web-port 3000
